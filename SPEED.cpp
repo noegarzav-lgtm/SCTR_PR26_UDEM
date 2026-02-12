@@ -1,8 +1,9 @@
-#include "Speed.h"
+#include "Speed.hpp"
 
+extern HardwareSerial Serial;
 extern QueueHandle_t encoder_count_queue;
 TaskHandle_t speed_task_handle = NULL;
-QueueHandle_t speed_queue = NULL;
+QueueHandle_t speed_queue;
 
 uint8_t init_speed(){
     speed_queue = xQueueCreate(1,sizeof(int32_t));
@@ -11,9 +12,9 @@ uint8_t init_speed(){
         "Speed_Calculation",
         2048,
         NULL,
-        1,
+        High_Priority,
         &speed_task_handle,
-        CORE_1
+        CORE_0
     );
     if (result_speed == pdPASS){
         return 1;
@@ -25,10 +26,11 @@ uint8_t init_speed(){
 
 void get_speed(void *pvParameters){
    int PPR = 205;
+   uint8_t ms = 10;
    int32_t contador_actual = 0;
    int32_t contador_anterior = 0;
    int32_t delta = 0;
-
+   TickType_t xLastWakeTime = xTaskGetTickCount();
    int rpm = 0;
 
    for(;;){
@@ -39,10 +41,10 @@ void get_speed(void *pvParameters){
         
         rpm = (delta*60000)/(PPR*ms);
         xQueueOverwrite(speed_queue,&rpm);
+        Serial.printf("Velocidad: ", rpm);
     }
-    vTaskDelay(pdMS_TO_TICKS(ms));
+    vTaskDelayUntil(&xLastWakeTime,pdMS_TO_TICKS(ms));
    }
 
 
 }
-
