@@ -10,7 +10,7 @@ TaskHandle_t encoder_handle = NULL;
 
 uint8_t init_encoder()
 {
-    encoder_queue = xQueueCreate(1, sizeof(bool));
+    encoder_queue = xQueueCreate(1, sizeof(int32_t));
     encoder_count_queue = xQueueCreate(1, sizeof(int32_t));
 
     BaseType_t result_encoder = xTaskCreatePinnedToCore(
@@ -18,7 +18,7 @@ uint8_t init_encoder()
                                         "Encoder_Pulses",
                                         2048,
                                         NULL,
-                                        1,
+                                        High_Priority,
                                         &encoder_handle,
                                         CORE_0); 
 
@@ -37,10 +37,10 @@ void IRAM_ATTR leerEncoder() {
     xQueueSendFromISR(encoder_queue, &flag, NULL);
 }
 
-void encoder_function(void *Parameter)
+void encoder_function(void *pvParameters)
 {
     bool flag;
-    int32_t CONTADOR=0;
+    int32_t CONTADOR;
     attachInterrupt(digitalPinToInterrupt(PIN_A), leerEncoder, CHANGE);
 
     for(;;)
@@ -61,7 +61,7 @@ void encoder_function(void *Parameter)
                 else
                     CONTADOR--;
             }
-            Serial.print(CONTADOR);
+            //Serial.print(CONTADOR);
             xQueueOverwrite(encoder_count_queue,&CONTADOR);
         }
     }
