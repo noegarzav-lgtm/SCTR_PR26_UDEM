@@ -6,7 +6,7 @@ extern HardwareSerial Serial;
 extern QueueHandle_t datos_gui_queue;
 // Declaramos queue que mandara el setpoint desde el GUI hacia el PID
 QueueHandle_t set_point_queue;
-
+QueueHandle_t pid_ks_queue;
 // Declaramos Task handle para nuestra tarea del GUI
 TaskHandle_t gui_handle = NULL;
 
@@ -15,6 +15,7 @@ uint8_t init_GUI()
     Serial.setTimeout(10);
     // Declaramos queue con valor de la variable a mandar
     set_point_queue = xQueueCreate(1, sizeof(float));
+    pid_ks_queue = xQueueCreate(1, sizeof(PID_Ks_GUI));
     // Declaramos nuestro task con su respectiva funcion y core
     BaseType_t result_gui = xTaskCreatePinnedToCore(
         gui_task,
@@ -39,7 +40,7 @@ uint8_t init_GUI()
 void gui_task(void *pvParameters)
 {
     // Declaramos una variable con el struct a recibir los datos
-    Datos_recibidos datos_recibidos = {0, 0, 0};
+    Datos_recibidos datos_recibidos = {0, 0, 0, 0};
     // Declaramos variable con valor del setpoint que se recibe por UART
     float setpoint;
     // Creamos nuestro temporizador que realiza bloquea el task a su periodo
@@ -53,10 +54,28 @@ void gui_task(void *pvParameters)
             String input = Serial.readStringUntil('\n');
             input.trim();
 
-            if (input.length() > 0)
+            if (input.startsWith("SP"))
             {
+                input.remove(0, 3); // quita "SP,"
                 float new_sp = input.toFloat();
                 xQueueOverwrite(set_point_queue, &new_sp);
+            }
+            else if (input.startsWith("PID"))
+            {
+                input.remove(0, 4);
+
+                float kc, ti, td;
+
+                int firstComma = input.indexOf(',');
+                int secondComma = input.indexOf(',', firstComma + 1);
+
+                kc = input.substring(0, firstComma).toFloat();
+                ti = input.substring(firstComma + 1, secondComma).toFloat();
+                td = input.substring(secondComma + 1).toFloat();
+
+                // Aquí mandas a otra queue
+                PID_Ks_GUI params = {kc, ti, td};
+                xQueueOverwrite(pid_ks_queue, &params);
             }
         }
 
@@ -69,6 +88,8 @@ void gui_task(void *pvParameters)
             Serial.print(datos_recibidos.OP);
             Serial.print(",");
             Serial.print(datos_recibidos.Error);
+            Serial.print(",");
+            Serial.print(datos_recibidos.SP);
             Serial.println();
         }
         // Bloqueamos la tarea a su periodo de 100ms

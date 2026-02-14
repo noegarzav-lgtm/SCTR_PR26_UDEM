@@ -22,7 +22,9 @@ typedef struct{
     float PV;
     float OP;
     float Error;
+    float SP;
 }Datos_GUI;
+
 
 //Declaramos funciones a utilizar en el hanlder 
 uint8_t init_PID();

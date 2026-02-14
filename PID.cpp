@@ -5,6 +5,7 @@ extern HardwareSerial Serial;
 // Declaramos el queue que viene desde el handler de la velocidad y el handler del GUI para el setpoint
 extern QueueHandle_t speed_queue;
 extern QueueHandle_t set_point_queue;
+extern QueueHandle_t pid_ks_queue;
 
 //Declaramos queues para mandar el PID al handler del motor y los datos al GUI
 QueueHandle_t PID_queue;
@@ -39,18 +40,18 @@ uint8_t init_PID(){
 
 void get_PID(void * pvParameters){
     //Declaramos nuestro struct de los valores de sintonizacion, aqui cambias la sintonizacion
-    PID_Ks PID_Ks = {0.25, 0.05, 0.0}; 
+    PID_Ks PID_Ks = {0,0,0}; 
     
     //Declaramos otros structs para usar y mandar variables
     PID_vals PID_vals = {0, 0, 0};
-    Datos_GUI Datos_GUI = {0, 0, 0};
+    Datos_GUI Datos_GUI = {0, 0, 0, 0};
     
     //declaramos el tiempo de muestreo, que definimos de 10 ms en base al periodo
     const float dt = 0.01; 
     
     // Variables para calcular la manipulacion
     float PID_Output = 0;
-    float set_point = 100;
+    float set_point = 0;
     float error_actual = 0;
     float error_anterior = 0; 
     
@@ -67,6 +68,7 @@ void get_PID(void * pvParameters){
 
         //usamos QueueRecieve para ver si recibimos el setpoint nuevo desde el GUI
         xQueueReceive(set_point_queue, &set_point, 0);
+        xQueueReceive(pid_ks_queue, &PID_Ks,0);
 
         //Usamos if para asegurarnos de calcular el PID solo cuando se recibe la velocidad
         if(xQueueReceive(speed_queue, &rpm_actual_int, pdMS_TO_TICKS(20)) == pdPASS){
@@ -110,6 +112,7 @@ void get_PID(void * pvParameters){
             Datos_GUI.PV = rpm_actual;
             Datos_GUI.OP = PID_Output;
             Datos_GUI.Error = error_actual;
+            Datos_GUI.SP = set_point;
             xQueueOverwrite(datos_gui_queue, &Datos_GUI);
 
             //Mandamos manipulacion al handler del motor
