@@ -54,7 +54,14 @@ void get_PID(void * pvParameters){
     float set_point = 0;
     float error_actual = 0;
     float error_anterior = 0; 
+
+    // Variables para calcular la jitter y latencia
+    int64_t t_inicio = 0;
+    int64_t t_fin = 0;
+    int64_t t_anterior = esp_timer_get_time();
     
+    //Nuestro temporizador para el bloqueo
+    const int TARGET_US = 10000; // 10ms
     //Declaramos dos rpm actual, uno para recibir en el tamño de dato correcto, el otro para usar en calculo
     int32_t rpm_actual_int = 0; 
     float rpm_actual = 0;      
@@ -66,12 +73,17 @@ void get_PID(void * pvParameters){
         // Bloqueo de tarea para realizarla con periodo de 10ms
         vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(10));
 
+        t_inicio = esp_timer_get_time();
+        int32_t periodo_real = (int32_t)(t_inicio - t_anterior);
+        int32_t jitter = (int32_t)(periodo_real - TARGET_US);
+        t_anterior = t_inicio;
+
         //usamos QueueRecieve para ver si recibimos el setpoint nuevo desde el GUI
         xQueueReceive(set_point_queue, &set_point, 0);
         xQueueReceive(pid_ks_queue, &PID_Ks,0);
 
         //Usamos if para asegurarnos de calcular el PID solo cuando se recibe la velocidad
-        if(xQueueReceive(speed_queue, &rpm_actual_int, pdMS_TO_TICKS(20)) == pdPASS){
+        if(xQueueReceive(speed_queue, &rpm_actual_int,0) == pdPASS){
             //casteamos el valor de los rpm
             rpm_actual = (float)rpm_actual_int;
 
@@ -119,7 +131,11 @@ void get_PID(void * pvParameters){
             xQueueOverwrite(PID_queue, &PID_Output);
 
             //Imprimimos todos nuestros valores clave para aseguranos que funcione correctamente (para debuggeo)
-            Serial.printf("SP: %.1f | PV: %.1f | Err: %.1f | PID: %.1f\n", set_point, rpm_actual, error_actual, PID_Output);
+            //Serial.printf("SP: %.1f | PV: %.1f | Err: %.1f | PID: %.1f\n", set_point, rpm_actual, error_actual, PID_Output);
         }
+        t_fin = esp_timer_get_time();
+        int32_t latency = (int32_t)(t_fin - t_inicio);
+
+        report_info(TASK_PID,jitter,latency,periodo_real);
     }
 }

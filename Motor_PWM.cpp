@@ -37,6 +37,13 @@ void send_PWM(void * pvParameters){
     //Variable que recibe la manipulacion por el queue
     float PWM_val = 0;
     //Nuestro temporizador para el bloqueo
+    const int TARGET_US = 10000; // 10ms
+    
+    int64_t t_inicio = 0;
+    int64_t t_fin = 0;
+    int64_t t_anterior = esp_timer_get_time();
+
+
     TickType_t xLastWakeTime = xTaskGetTickCount();
     //Activamos los pines del motor
     digitalWrite(AIN1, HIGH);
@@ -44,15 +51,25 @@ void send_PWM(void * pvParameters){
     digitalWrite(STBY,HIGH);
 
     for(;;){
+        //Bloqueo del task para que se realice cada 10ms
+        vTaskDelayUntil(&xLastWakeTime,pdMS_TO_TICKS(10));
+        t_inicio = esp_timer_get_time();
+        int32_t periodo_real = (int32_t)(t_inicio - t_anterior);
+        int32_t jitter = (int32_t)(periodo_real - TARGET_US);
+        t_anterior = t_inicio;
+        
         //Usamos condicion para que se aplique el PWM solo cuando se recibe manipulacion
-        if(xQueueReceive(PID_queue, &PWM_val, portMAX_DELAY) == pdPASS){
+        if(xQueueReceive(PID_queue, &PWM_val, 0) == pdPASS){
             //Usamos analogWrite para aplicar la señal PWM (manipulacion) en su respectivo pin
             analogWrite(PWM, PWM_val);
             //Impresion de que si se realizo la actividad (para debuggeo)
             //Serial.printf("Señal PWM mandada!");
         }
 
-        //Bloqueo del task para que se realice cada 10ms
-        vTaskDelayUntil(&xLastWakeTime,pdMS_TO_TICKS(10));
+        t_fin = esp_timer_get_time();
+        int32_t latency = (int32_t)(t_fin - t_inicio);
+
+        report_info(TASK_PWM,jitter,latency,periodo_real);
+
     }
 }

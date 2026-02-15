@@ -41,10 +41,17 @@ void get_speed(void *pvParameters){
     int32_t contador_anterior = 0;
     int32_t delta = 0;
     const int PPR_EFECTIVOS = 205; 
-    const uint8_t TIEMPO_MUESTREO_MS = 10; 
+    const uint8_t TIEMPO_MUESTREO_MS = 5; 
     
     // Bandera para evitar salto brusco en salida 
     bool primer_calculo = true; 
+
+    //Nuestro temporizador para el bloqueo
+    const int TARGET_US = 10000; // 10ms
+    
+    int64_t t_inicio = 0;
+    int64_t t_fin = 0;
+    int64_t t_anterior = esp_timer_get_time();
     
     // Inicialización del tiempo para vTaskDelayUntil
     TickType_t xLastWakeTime = xTaskGetTickCount();
@@ -52,6 +59,11 @@ void get_speed(void *pvParameters){
     for(;;){
         //Bloqueo del task para que se active solamente en su tiempo de periodo
         vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(TIEMPO_MUESTREO_MS));
+
+        t_inicio = esp_timer_get_time();
+        int32_t periodo_real = (int32_t)(t_inicio - t_anterior);
+        int32_t jitter = (int32_t)(periodo_real - TARGET_US);
+        t_anterior = t_inicio;
 
         //Con un if, nos aseguramos que el calculo de la velocidad suceda solo cuando se recibe un dato
         if(xQueueReceive(encoder_count_queue, &contador_actual, 0) == pdPASS){
@@ -85,5 +97,9 @@ void get_speed(void *pvParameters){
         }
         else {
         }
+        t_fin = esp_timer_get_time();
+        int32_t latency = (int32_t)(t_fin - t_inicio);
+
+        report_info(TASK_SPEED,jitter,latency, periodo_real);
     }
 }

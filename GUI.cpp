@@ -39,14 +39,35 @@ uint8_t init_GUI()
 
 void gui_task(void *pvParameters)
 {
+    Task_info metricas;
     // Declaramos una variable con el struct a recibir los datos
     Datos_recibidos datos_recibidos = {0, 0, 0, 0};
     // Declaramos variable con valor del setpoint que se recibe por UART
     float setpoint;
+
+    //Nuestro temporizador para el bloqueo
+    const int TARGET_US = 10000; // 10ms
+    
+    int64_t t_inicio = 0;
+    int64_t t_fin = 0;
+    int64_t t_anterior = esp_timer_get_time();
+
     // Creamos nuestro temporizador que realiza bloquea el task a su periodo
     TickType_t xLastWakeTime = xTaskGetTickCount();
     for (;;)
     {
+        t_inicio = esp_timer_get_time();
+        int32_t periodo_real = (int32_t)(t_inicio - t_anterior);
+        int32_t jitter = (int32_t)(periodo_real - TARGET_US);
+        t_anterior = t_inicio;
+
+        //Obtenemos metricas del RTCS
+        metricas = get_metricas();
+        // Serial.print("\nLatencia: ");
+        // Serial.print(metricas.pwm.latencia_maxima/1000.0f);//Dividido entre 1 millon para escalar milis
+        // Serial.print("\nJitter: ");
+        // Serial.print(metricas.pwm.jitter_maximo/1000.0f);//Dividido entre 1 millon para escalar milis
+
 
         // Revisamos constantemente si se mando el setpoint por puerto serial
         if (Serial.available() > 0)
@@ -90,9 +111,37 @@ void gui_task(void *pvParameters)
             Serial.print(datos_recibidos.Error);
             Serial.print(",");
             Serial.print(datos_recibidos.SP);
+            Serial.print(",");
+            Serial.print(metricas.pid.periodo_real/1000.0f);
+            Serial.print(",");
+            Serial.print(metricas.pid.latencia_maxima/1000.0f);
+            Serial.print(",");
+            Serial.print(metricas.pid.jitter_maximo/1000.0f);
+            Serial.print(",");
+            Serial.print(metricas.pwm.periodo_real/1000.0f);
+            Serial.print(",");
+            Serial.print(metricas.pwm.latencia_maxima/1000.0f);
+            Serial.print(",");
+            Serial.print(metricas.pwm.jitter_maximo/1000.0f);
+            Serial.print(",");
+            Serial.print(metricas.speed.periodo_real/1000.0f);
+            Serial.print(",");
+            Serial.print(metricas.speed.latencia_maxima/1000.0f);
+            Serial.print(",");
+            Serial.print(metricas.speed.jitter_maximo/1000.0f);
+            Serial.print(",");
+            Serial.print(metricas.gui.periodo_real/1000.0f);
+            Serial.print(",");
+            Serial.print(metricas.gui.latencia_maxima/1000.0f);
+            Serial.print(",");
+            Serial.print(metricas.gui.jitter_maximo/1000.0f);
             Serial.println();
         }
         // Bloqueamos la tarea a su periodo de 100ms
         vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(100));
+        t_fin = esp_timer_get_time();
+        int32_t latency = (int32_t)(t_fin - t_inicio);
+
+        report_info(TASK_GUI,jitter,latency, periodo_real);
     }
 }

@@ -46,6 +46,29 @@ constexpr uint8_t Low_Priority = 1;
 #define CORE_0      0
 #define CORE_1      1
 
+typedef enum{
+    TASK_ENCODER,
+    TASK_SPEED,
+    TASK_PID,
+    TASK_GUI,
+    TASK_PWM,
+} System_ID;
 
+typedef struct{
+    int32_t jitter_maximo;
+    int32_t latencia_maxima;
+    int32_t periodo_real;
+} Task_ID;
+
+typedef struct{
+    Task_ID encoder;
+    Task_ID speed;
+    Task_ID pid;
+    Task_ID gui;
+    Task_ID pwm;
+} Task_info;
+
+void report_info(System_ID task, int32_t jitter, int32_t latencia, int32_t periodo);
+Task_info get_metricas();
 
 #endif
